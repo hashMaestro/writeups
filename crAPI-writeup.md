@@ -47,6 +47,7 @@ Beobachtung: `alg` = `HS256`. Token-Claim enthält `role: "user"`.
 (Bei anderen Schwachstellen wie IDOR, SQLi oder RCE passen die Schritte entsprechend an.)
 
 ---
+<img width="400" height="82" alt="image" src="https://github.com/user-attachments/assets/ae6965ec-ff2d-4b64-84ac-32fe656276cb" />
 
 ## Exploitation — Proof of Concept
 
