@@ -79,7 +79,21 @@ Damit schneidet
 Ich möchte die gesamte Angriffsfläche der Anwendung erfassen. Dazu zeichne ich alle API-Endpoints, Funktionen und zugehörigen Requests vollständig auf.
 
 **Vorgehen:**  
-1. Die Anwendung regulär im Browser bedienen und konsequent alle verfügbaren Funktionen durchspielen - sowohl mit regulären Eingaben als auch mit falschen/unerwarteten inputs.
+1. Die Anwendung regulär im Browser bedienen und konsequent **alle** verfügbaren Funktionen durchspielen - sowohl mit regulären Eingaben als auch mit falschen/unerwarteten inputs.
 2. Sämtliche ausgehenden HTTP(S)-Requests im Proxy-Interface mitschneiden (Headers, Query-Parameter, Request-Body, Response).  
 3. Besonderes Augenmerk auf kritische Funktionen wie Authentifizierungs- und Session-Mechanismen, Datei-Uploads, Formular-Inputs und Fehlermeldungen legen.  
-4. Nach Abschluss die aufgezeichneten Requests exportieren oder als Referenz dokumentieren (Endpoint, Methode, Beispiel-Request/-Response, beobachtetes Verhalten).
+
+**Anschließend:**
+1. Flows in .har konvertieren:
+   <Bild> von Options -> Export
+
+   ```bash
+   mitmweb -r flows.har
+   ```
+   
+2. In Postman importieren und nach "Thema" (Auth, Admin, Users, Upload) sortieren:
+   <Bild>
+
+Jetzt kann ich anfangen die OWASP Top 10 durchzugehen und die entsprechenden Requests auf Schwachstellen untersuchen oder direkt interessante Requests untersuchen.
+
+
