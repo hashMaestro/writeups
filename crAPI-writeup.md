@@ -19,33 +19,15 @@ In diesem Writeup zeige ich meine Herangehensweise und Gedanken während des Pen
 
 ### crAPI Setup
 crAPI wird auf einer Ubuntu-VM ausgeführt und mit Docker Compose bereitgestellt:
-1. VM updaten und neuen Ordner erstellen
-   ```bash
-   sudo apt update && sudo apt upgrade -y
-   mkdir crapi
-   cd crapi
-
-2. docker-compose.yml aus dem offiziellen Repository herunterladen:  
-   ```bash
-   curl -o docker-compose.yml https://raw.githubusercontent.com/OWASP/crAPI/main/deploy/docker/docker-compose.yml
-3. Erforderliche Docker images pullen:
-   ```bash
-   docker-compose pull
-4. App mit docker-compose starten / stoppen:
-   ```bash
-   docker-compose -f docker-compose.yml --compatibility up -d
-   ```
-   
-   ```bash
-   docker-compose -f docker-compose.yml stop
-5. Die App ist jetzt auf dem localhost unter Port **8888** (crAPI) und Port **8025** (MailHog) erreichbar und erfolgreich installiert.
-
-
-
+1. Docker installieren wie in den Docs beschrieben: https://docs.docker.com/engine/install/ubuntu
+2. crAPI installieren wie in Docs den beschrieben:  https://owasp.org/crAPI/docs/setup.html
+5. Die App ist jetzt auf dem localhost unter Port **8888** (crAPI) und Port **8025** (MailHog) erreichbar und erfolgreich installiert: 
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/f65f4e29-c7ad-4421-8ad7-1e2f9d9d99e5" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/7b960514-9da6-4427-958b-9e02ba6968a7" />
 
 ### Proxy Setup 
 
-Bevor ich die App zum ersten Mal benutze richte ich einen Proxy ein, um alle HTTP Requests zwischen dem Client (Browser) und dem Webserver (crAPI) für die spätere Analyse aufzuzeichnen.
+Bevor ich die App zum ersten Mal benutze richte ich einen Proxy ein, um alle Requests zwischen dem Client (Browser) und dem Webserver (crAPI) für die spätere Analyse aufzuzeichnen.
 
 1. mitmproxy / mitmweb installieren:
 ```bash
@@ -53,9 +35,8 @@ sudo apt install mitmproxy -y
 ```
 2. Proxy starten (Hört auf localhost:8080, Web-UI auf localhost:8081):
 ```bash
-mitmweb --listen-port 8080
+mitmweb 
 ```
-Damit schneidet
 
 3. Firefox so konfigurieren, dass der Traffic über den Proxy läuft:
    
@@ -66,10 +47,19 @@ Damit schneidet
    
    <img width="1848" height="1003" alt="image" src="https://github.com/user-attachments/assets/10537bb4-2520-4767-8262-7c288f48145e" />
    <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/383d7875-1391-4ad1-b727-30069fc98c45" />
+   
+5. Da Firefox bei Anfragen zum localhost/127.0.0.1 standardmäßig den Proxy bypasst muss in /etc/hosts ein Eintrag für crapi erstellt werden:
+   ```bash
+   sudo nano /etc/hosts
+   ```
+   <img width="814" height="576" alt="image" src="https://github.com/user-attachments/assets/ad01f36a-e14c-48ee-9dfd-9123ecb39692" />
 
-5. Dass alles richtig eingerichtet ist, sehen wir an den aufgezeichneten Requests in dem Web-UI des Proxys:
+   Nach dem schreiben mit Strg + O speichern ung mit Strg + X verlassen.
 
-   <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/56e6603f-ae29-4b9d-beaf-86d7de5c9926" />
+   
+7. Ruft man *http://crapi.local* auf den entsprechenden Ports **8888** (crAPI) und **8025** (MailHog) auf sieht man die aufgezeichneten Requests im Proxy Web-UI:
+   <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/232a9897-f17a-43b1-9edf-1d438db41782" />
+
 
 ---
 
