@@ -29,13 +29,13 @@ crAPI wird auf einer Ubuntu-VM ausgeführt und mit Docker Compose bereitgestellt
 
 Bevor ich die App zum ersten Mal benutze richte ich einen Proxy ein, um alle Requests zwischen dem Client (Browser) und dem Webserver (crAPI) für die spätere Analyse aufzuzeichnen.
 
-1. mitmproxy / mitmweb installieren:
+1. mitmproxy / mitmdump installieren:
 ```bash
 sudo apt install mitmproxy -y
 ```
-2. Proxy starten (Hört auf localhost:8080, Web-UI auf localhost:8081):
+2. Proxy starten und Aufzeichnungen in *traffic.mitm* speichern:
 ```bash
-mitmweb 
+mitmdump -w traffic.mitm
 ```
 
 3. Firefox so konfigurieren, dass der Traffic über den Proxy läuft:
@@ -74,11 +74,10 @@ Ich möchte die gesamte Angriffsfläche der Anwendung erfassen. Dazu zeichne ich
 3. Besonderes Augenmerk auf kritische Funktionen wie Authentifizierungs- und Session-Mechanismen, Datei-Uploads, Formular-Inputs und Fehlermeldungen legen.  
 
 **Anschließend:**
-1. Flows in .har konvertieren:
-   <Bild> von Options -> Export
+1. Flows nach der relevanten Domain filtern (*traffic.mitm* lesen -> Domains nach "crapi.local" filtern -> in *filtered.mitm* speichern):
 
    ```bash
-   mitmweb -r flows.har
+   mitmdump -nr traffic.mitm -w filtered.mitm "~d crapi.local"
    ```
    
 2. In Postman importieren und nach "Thema" (Auth, Admin, Users, Upload) sortieren:
