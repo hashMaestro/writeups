@@ -53,6 +53,7 @@ mitmweb
    ```
    <img width="814" height="576" alt="image" src="https://github.com/user-attachments/assets/ad01f36a-e14c-48ee-9dfd-9123ecb39692" />
 
+   Dadurch wird die Adresse lokal aufgelöst, aber nicht als „localhost“ erkannt, sodass Firefox den Proxy nutzt und der Traffic von mitmproxy aufgezeichnet werden kann.
    Nach dem schreiben mit Strg + O speichern ung mit Strg + X verlassen.
 
    
