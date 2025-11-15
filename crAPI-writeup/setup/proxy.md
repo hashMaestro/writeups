@@ -27,7 +27,6 @@ mitmweb
    <img width="814" height="576" alt="image" src="https://github.com/user-attachments/assets/ad01f36a-e14c-48ee-9dfd-9123ecb39692" />
 
    Dadurch wird die Adresse lokal aufgelöst, aber nicht als „localhost“ erkannt, sodass Firefox den Proxy nutzt und der Traffic von mitmproxy aufgezeichnet werden kann.
-   Nach dem Schreiben mit Strg + O speichern und mit Strg + X verlassen.
 
    
 7. Ruft man *http://crapi.local* auf den entsprechenden Ports **8888** (crAPI) und **8025** (MailHog) auf sieht man die aufgezeichneten Requests im Proxy Web-UI:
