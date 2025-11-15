@@ -46,4 +46,4 @@ Um sich in jeder Postman-Request zu authentifizieren, muss über den Login-Endpo
 
 <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/98cb0fc9-e66d-45c6-8f17-80f32de5bb3d" />
 
-Dieser Token kann wird im Collection-Tab unter Auth als Bearer Token eingefügt. 
+Dieser Token wird anschließend als Environment-Variable für den entsprechenden User eingefügt.
