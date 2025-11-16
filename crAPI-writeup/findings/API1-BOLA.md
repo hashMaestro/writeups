@@ -1,9 +1,17 @@
 ## Broken Access Control - BOLA 
+## TL;DR
+Die Tests wurden durchgeführt, indem jeweils ein Objekt (Video, Order, Fahrzeug) als User A erstellt oder im UI ausgelöst und anschließend die zurückgegebene ID in derselben Route erneut als User B abgefragt wurde. In allen Fällen lieferte der Server vollständige Daten, ohne die Eigentümerschaft zu prüfen. Auf diese Weise konnten fremde 
+- Videos ,
+- Bestellungen mit personenbezogenen Daten wie Namen, E-Mail, Telefonnummer,
+- Produktdetails, Zahlungsstatus, Transaktions-IDs und Kreditkartenmetadaten
+- Fahrzeugdaten mit GPS-Koordinaten,
+- Halterinformationen und Fahrzeugdetails
+
+abgerufen werden. Dies ermöglicht einem Angreifer den unautorisierten Zugriff auf besonders schützenswerte Daten allein durch Kenntnis der jeweiligen Objekt-ID.
 
 ### BOLA
 BOLA (Broken Object Level Authorization) ist eine kritische API-Schwachstelle, die es Angreifern ermöglicht, fremde Objekte zu lesen oder zu verändern, indem sie lediglich Objekt-IDs in der URL oder im Request manipulieren. Ursache ist meist eine fehlende oder fehlerhafte serverseitige Prüfung, ob der anfragende Benutzer tatsächlich berechtigt ist, auf das angeforderte Objekt zuzugreifen.
 
-So kann zum Beispiel User 1 sowohl auf das Objekt */users/dashboard/1* als auch */users/dashboard/2* zugreifen, wozu er allerdings nicht berechtigt ist.
 
 1. Zweiten User *userB* erstellen per Request oder im Browser und einloggen für Bearer-Token:
 <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/13064987-efc0-4a1d-9c4f-069fe68ae254" />
@@ -23,7 +31,7 @@ Für die BOLA-Tests wurden alle API-Endpunkte betrachtet, die Objekt-IDs im Pfad
 *GET /identity/api/v2/user/videos/{id}* <br>
 *PUT /identity/api/v2/user/videos/{id}* <br>
 *POST /identity/api/v2/user/videos/{id}* <br>
-*DELETE /identity/api/v2/user/videos/{video_id}* <br>
+*DELETE /identity/api/v2/user/videos/{id}* <br>
 
 #### Orders
 *GET /workshop/api/shop/orders/{id}*<br>
@@ -32,8 +40,7 @@ Für die BOLA-Tests wurden alle API-Endpunkte betrachtet, die Objekt-IDs im Pfad
 #### Vehicles
 *GET /identity/api/v2/vehicle/{vehicleId}/location*
 
-#### Admin
-*DELETE /identity/api/v2/admin/videos/{video_id}*
+
 
 Der Endpoint *GET /community/api/v2/community/posts/{postId}* erlaubt den Aufruf beliebiger Community-Posts anhand ihrer Post-ID. Da die Plattform Community-Posts grundsätzlich öffentlich zugänglich macht und keine Rollen oder Zugriffsbeschränkungen (Wie public/private/friends) vorsieht, stellt dieser Zugriff in dem Fall keine BOLA-Schwachstelle dar.
 
@@ -41,14 +48,14 @@ Wären in der Anwendung jedoch Zugriffsstufen wie **privat**, **freigegeben** od
 
 Um die Route **/identity/api/v2/user/videos/{id}** auf BOLA zu testen, lade ich zunächst als **User A** über den vorgesehenen Upload-Endpoint ein neues Video hoch und erhalte dabei eine eindeutige *videoId*. Anschließend wechsle ich in Postman in das **User B**-Environment und sende einen GET-Request an dieselbe Route, jedoch mit der *videoId* von **User A**. Ich analysiere die Serverantwort, um festzustellen, ob **User B** unberechtigt auf die fremde Ressource zugreifen kann.
 
-1. Nach dem Hochladen im UI gibt die API als Response die Video-ID zurück:
+1. Nach dem Hochladen im UI (als userA) gibt die API als Response die Video-ID zurück:
    <img width="878" height="205" alt="image" src="https://github.com/user-attachments/assets/150ba517-4a65-40ec-a707-b13e410268be" />
 
 2. Diese ID als ID im GET Endpunkt als userB verwenden:
    <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/bafe907e-57c6-4137-8832-3df52e943baa" />
 
    
-Wie man sieht, gibt der Server einen Code 200 und das gesamte Video in base64 Kodierung zurück. <br>
+Der Server gibt einen Code 200 zurück und liefert das gesamte Video in base64 Kodierung zurück. <br>
 Der Base64-kodierte Payload lässt sich ohne zusätzliche Informationen zu einer funktionsfähigen MP4-Datei dekodieren:
 
 ```
@@ -58,7 +65,7 @@ Der Base64-kodierte Payload lässt sich ohne zusätzliche Informationen zu einer
 <img width="1471" height="828" alt="image" src="https://github.com/user-attachments/assets/933f75c6-cb73-4e65-8a65-3a1dde19663f" />
 <br>
 
-Mit der HTTP Methode DELETE wird Code 404 zurückgegeben, da dies eine Admin-Funktionalität ist. Wie man dies umgehen kann, wird später überprüft. <br>
+Mit der HTTP Methode DELETE wird Code 404 zurückgegeben, da dies eine Admin-Funktionalität ist. Wie man dies umgehen kann, wird im Kapitel API2-BFLA überprüft, da es sich hierbei um eine serverseitige Prüfung auf Funktionsebene handelt. <br>
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/003307ec-d262-4587-9744-87749fe1a39c" />
 
 
@@ -73,6 +80,9 @@ Die zentrale Ursache:
 - Die API prüft nicht, ob der anfragende Benutzer Eigentümer des Videos ist.
 - Die Ressource ist allein über eine vorhersehbare, nicht geschützte ID adressierbar.
 - Jede gültige Video-ID führt zu einer erfolgreichen, unautorisierten Datenoffenlegung.
+
+Der Endpoint *DELETE /identity/api/v2/user/videos/{id}* weist selber zwar keine BOLA-Schwachstelle auf, allerdings kann die Lösch-Funktion der Videos über eine Admin Route trotzdem aufgerufen werden. Mehr dazu im Kapitel API2-BFLA.
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/21e2749f-c6fb-405c-bce7-b82b48e84675" />
 
 ### Konsequenzen
 
@@ -130,6 +140,34 @@ Um die Route */workshop/api/shop/orders/{id}* auf BOLA zu testen gehe ich wie be
 
 Damit zeigt der Test eindeutig, dass auch diese Route nicht gegen BOLA geschützt ist. Zusätzlich werden hier besonders sensible Daten offengelegt, darunter E-Mail-Adresse, Telefonnummer, Timestamps und vollständige Zahlungsinformationen. Dadurch entsteht nicht nur ein klassischer Objektzugriffsschutzfehler, sondern auch eine schwerwiegende Verletzung von Datenschutz- und Sicherheitsanforderungen.
 
+## Vehicles
 
+Über den Endpoint *GET /identity/api/v2/vehicle/{vehicleId}/location* können GPS-Positionen von Fahrzeugen abgerufen werden und wird im UI über den Button *Refresh Location* angefragt:
+<img width="1476" height="867" alt="image" src="https://github.com/user-attachments/assets/dae09d7d-2bc5-4d9b-89e3-e059e38f4904" />
 
+1. Als **userA** die Request auslösen und *vehicleID* aus Response entnehmen:
+<img width="915" height="572" alt="image" src="https://github.com/user-attachments/assets/939e8570-2c77-49a9-8836-194e8e92cece" />
+
+2. Beim Aufrufen des Endpoints als **userB** werden sensible Daten über das Fahrzeug, den GPS-Standort und den Halter preisgegeben:
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/9003cba7-922c-43d2-bbb3-a1ef77e2174b" />
+
+### Sicherheitsbewertung
+Die Route weist eine Broken Object Level Authorization (BOLA)-Schwachstelle auf.
+Die zentrale Ursache:
+- Die API prüft nicht, ob der anfragende Benutzer Eigentümer des Autos ist oder berechtigt ist, die Daten über das Auto abzurufen.
+- Die Daten sind über eine (praktisch unvorhersebare) UUIDv4 erreichbar.
+- Jede gültige ID führt zu einer erfolgreichen, unautorisierten Datenoffenlegung.
+  
+### Konsequenzen
+Durch Ausnutzung der Schwachstelle könnten Angreifer:
+- GPS-Standortdaten
+- Halterdaten
+- Fahrzeugdaten
+
+einsehen.
+
+Hierbei haben die IDs das *UUIDv4* Format, was das Enumerieren bzw. brute-forcen der IDs praktisch unmöglich macht, sofern die Vergabe korrekt implementiert ist und keine pseudo-sequenziellen UUIDs oder schwache RNGs benutzt.
+
+## Fazit
+Die Analyse zeigt, dass mehrere API-Routen gravierende Fehler in der objektbezogenen Zugriffskontrolle aufweisen. Video-, Order- und Vehicle-Endpunkte erlauben unautorisierte Zugriffe auf fremde Ressourcen allein durch Kenntnis der jeweiligen Objekt-ID. Besonders kritisch ist, dass sensible Daten wie GPS-Positionen, Zahlungsinformationen oder private Medien ohne jegliche Eigentums- oder Berechtigungsprüfung offengelegt werden. Die Ursache liegt an fehlenden serverseitigen Autorisierungsmechanismen, die bei jedem Zugriff prüfen müssten, ob der anfragende Benutzer tatsächlich zum Objekt gehört oder über explizite Rechte verfügt.
 
