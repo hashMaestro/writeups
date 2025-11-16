@@ -46,6 +46,8 @@ Der Endpoint *GET /community/api/v2/community/posts/{postId}* erlaubt den Aufruf
 
 Wären in der Anwendung jedoch Zugriffsstufen wie **privat**, **freigegeben** oder **nur für Freunde sichtbar** implementiert, müsste geprüft werden, ob der Server bei einem Aufruf mit fremden postId-Werten eine Autorisierungsprüfung durchführt. Nur dann wäre dieser Endpoint sicherheitsrelevant im Kontext von BOLA.
 
+## Videos
+
 Um die Route **/identity/api/v2/user/videos/{id}** auf BOLA zu testen, lade ich zunächst als **User A** über den vorgesehenen Upload-Endpoint ein neues Video hoch und erhalte dabei eine eindeutige *videoId*. Anschließend wechsle ich in Postman in das **User B**-Environment und sende einen GET-Request an dieselbe Route, jedoch mit der *videoId* von **User A**. Ich analysiere die Serverantwort, um festzustellen, ob **User B** unberechtigt auf die fremde Ressource zugreifen kann.
 
 1. Nach dem Hochladen im UI (als userA) gibt die API als Response die Video-ID zurück:
