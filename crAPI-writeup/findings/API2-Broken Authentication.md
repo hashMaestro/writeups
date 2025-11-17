@@ -12,7 +12,7 @@ Der Token wird bei jedem "frischen" Login generiert und dem User zugeteilt, der 
 
 Die JWTs sind mit RS256 signiert, enthalten die Rolle (z.B. user), die Login-Email sowie die Gültigkeitsdauer.
 
-Was sofort auffällt ist die unüblich lange Gültigkeitsdauer von 7 Tagen! Die Gültigkeitsdauer ist in den JWTs im Unix-Zeitformat angegeben 
+Was sofort auffällt ist die unüblich lange Gültigkeitsdauer von 7 Tagen. Die Gültigkeitsdauer ist in den JWTs im Unix-Zeitformat angegeben 
 und lässt sich einfach zurückrechnen: 
 - exp – iat = 1763979951 – 1763375151 = 604800 Sekunden = ~7 Tage
 
@@ -21,9 +21,10 @@ Wenn die API keine serverseitige Token-Invalidierung implementiert, kann ein Ang
 vollständig missbrauchen.
 
 ## Token-Invalidierung
-1. Um die API auf Token-Invalidierung zu prüfen logge ich mich über das UI ein und speichere den Token, den die API nach dem Einloggen zurückgibt:
-<img width="920" height="772" alt="image" src="https://github.com/user-attachments/assets/a4faccb8-c202-42e3-9983-629c23868415" />
+1. Um die API auf Token-Invalidierung zu prüfen logge ich mich über das UI ein und speichere den Token, den die API nach dem Einloggen          zurückgibt:
+   <img width="920" height="772" alt="image" src="https://github.com/user-attachments/assets/a4faccb8-c202-42e3-9983-629c23868415" />
 2. Anschließend ausloggen um die Token-Invalidierung auszulösen
+
 3. Wenn die Token-Invalidierung korrekt implementiert ist, sollte die API Requests mit diesem Bearer Token nicht mehr akzeptieren und einen
    Code 401 Unauthorized zurückgeben:
    <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/481c21d7-8809-46fd-93ed-44bdde963b1c" />
