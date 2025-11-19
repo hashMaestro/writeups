@@ -4,6 +4,7 @@ oder Tokens missbrauchen kann. Dazu zählen fehlerhafte Login-Mechanismen, unsic
 Schutzmaßnahmen gegen Brute-Force- oder Credential-Stuffing-Angriffe. Die Folge sind Kontoübernahmen, unautorisierte API-Aufrufe 
 und ein umfassender Verlust der Zugriffskontrolle. 
 
+# JWT- und Token-Verwaltung
 ## Auth in crAPI
 crAPI verwendet als Authentifizierungsmethode einen JWT (Single Token) als Bearer Token in jeder Request um den Nutzer zu authentifizieren. 
 Der Token wird bei jedem "frischen" Login generiert und dem User zugeteilt, der sich anmeldet. Mit [jwt.io](https://jwt.io) lassen sich JWTs dekodieren:
@@ -32,14 +33,196 @@ Die API akzeptiert die Anfrage auch nach Abmelden des Users, was belegt, dass ke
 
 ### Konsequenzen
 Ein Angreifer, der den Token zuvor abgefangen hat (z. B. durch Logging, XSS, Proxy oder Sniffing), erhält mindestens bis zum 
-Ablauf der Token-Lebenszeit (7 Tage!) vollständigen Zugriff auf das Konto des Opfers. Dabei gibt es keine Möglichkeit den Token zu widerrufen, 
-selbst wenn der Vorfall bemerkt wurde.
+Ablauf der Token-Lebenszeit (7 Tage!) vollständigen Zugriff auf das Konto des Opfers. Dabei gibt es keine Möglichkeit den Token zu widerrufen, selbst wenn der Vorfall bemerkt wurde.
 
 ### Fix
 - Serverseitigen Token-Revocation-Mechanismus einführen (z.B. Blacklist, Session-Store, Session-Versioning)
 - Token-Laufzeit auf 30-60 Minuten reduzieren
 - Invalidation aller aktiven Tokens bei kritischen Aktionen wie Logout, Passwortänderung, MFA-Änderung etc.
 
-## Token-Expiry-Handling
-Um zu prüfen, ob der JWT überhaupt nach seiner Lebenszeit abläuft, wird ein gültiger Token so manipuliert, dass *exp*  
+## JWT-Downgrading Angriff (alg: none)
+Beim Dekodieren der JWTs sieht man, dass die Bearer Token mit RS256 signiert werden. Ein typischer Angriff auf JWTs ist ein Downgrading Angriff bei dem der Signaturalgorithmus umgangen wird, indem der Signieralgorithmus im Token-Header von "RS256" auf schwache Signieralgorithmen gezwungen wird.
+
+Mit einem Tool wie jwt_tool kann man den Token Header manipulieren, sodass anstatt des Headers "alg: RS265" der Header "alg: none" geschickt wird, was bei einer Schwachstelle den gesamten Signieralgorithmus bypasst und somit auch der Private-Key des Servers irrelevant wird.
+
+Für diese Schwachstelle bietet jwt_tool ein eigenes Argument **-X a** um vier verschiedene Versionen vom "alg: none" Header (mit verschiedenen Schreibweisen von *none*) zu erstellen. Dazu wird dem Tool ein gültiger Token übergeben und das Argument **-X a** gesetzt:
+
+```bash
+python3 jwt_tool.py eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyQUBtYWlsLmNvbSIsImlhdCI6MTc2MzU1NjI4NCwiZXhwIjoxNzY0MTYxMDg0LCJyb2xlIjoidXNlciJ9.ON2HnfYWsdtmV5nd2wOMvWwoJ6-nfiJtPtFvfJyWYA6unk7Va8mKodp0d1QUtkaEMXMN7kBRW4sjNDcLFR2OplxZFvnEx_QqiMKGnuPlqm5aBMJDAl7KTalaH2mf7qU8pZPrkm_q6aRNjObL7yHzdgvya4yfmI6pazr6QMwlyhfBL0KQnukB-cizwctjspT3lELNzi2pLO2UqG2-EL1cprSP7oF_dC3DRh-eXJp2ogUMg58Qs97vooM3KbYh-voaksFXtQBqOCfnQ7fqQSrHQVh95USY73vELzUX6RSHmafRQbiuX8K-jJkTYUDxFY5Js-9HPQ-FUThSnP6kAysilg -X a
+```
+<img width="1017" height="941" alt="image" src="https://github.com/user-attachments/assets/a394bcd0-2d6a-405d-ab86-27c68a38fec7" />
+
+Jetzt wird in Postman der manipuliert Token als Authentifizierung übergeben um auf ein Objekt zuzugreifen:
+
+<img width="1841" height="958" alt="image" src="https://github.com/user-attachments/assets/747e4441-1980-41d8-9ac8-d5b2faf7081e" />
+
+Da der Server diesen manipulierten Token akzeptiert ist bewiesen, dass die API eine Schwachstelle gegenüber Downgrading Angriffe aufweist.
+
+### Analyse der gescheiterten horizontalen Eskalation
+Obwohl der Server unsignierte Tokens akzeptiert und der Zugriff auf geschützte Ressourcen des aktuellen Benutzers möglich ist, schlug die horizontale Eskalation (der Versuch, die Identität auf einen anderen Benutzer, z.B. userB, zu fälschen) fehl.
+
+Der Server lieferte stets die Daten des ursprünglichen Token-Besitzers (userA) zurück, selbst nachdem der sub Claim manipuliert wurde. Dies deutet auf eine inkonsistente Validierungslogik hin:
+
+- Die API vertraut den sekundären Payload-Claims (die nicht zur Identität gehören) und führt die angeforderte Funktion aus.
+- Die API ignoriert jedoch den manipulierten sub Claim und identifiziert den Benutzer über einen versteckten Mechanismus (z.B. einen unsichtbaren jti Claim oder einen Hash des Original-Tokens), der nicht manipuliert wurde und weiterhin auf User A verweist.
+
+Das bedeutet, dass die API zwar kritisch anfällig für den Signatur-Bypass ist, die horizontale Rechteausweitung jedoch aufgrund eines unbekannten Identifikators verhindert wird. Für eine horizontale Rechteausweitung ist also nicht nur die Email und der Username nötig sondern ein (für mich aktuell) obufszierter ID-Mechanismus.
+
+### Token-Expiry-Handling
+Dass man den Signieralgorithmus bypassen kann ermöglicht es, das Token-Expiry-Handling des Servers auch ohne private key zu testen.
+
+Vorgehen:
+1. "alg:" Header eines gültigen keys manipulieren:
+```bash
+   python3 jwt_tool.py  eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyQUBtYWlsLmNvbSIsImlhdCI6MTc2MzU2NDIxNiwiZXhwIjoxNzY0MTY5MDE2LCJyb2xlIjoidXNlciJ9.mbY_ud0k4W6I5v35zFKhQYxKrxUC1vKoYiBhQch3BVeorUUmg3IkCm5xXIBEJOrVhCoCm-R2iKHdVE1SiLrZECYGOLnXTXF0lHR3jfdAKwkZ7xqGdZnyBKQJYFnYiP7jJfjlLEV6-Z0fxLxMjh-Vba6MdgsBr3gnqMBxuIPlkSvt2kWBkft_Ilwrbp6YszBtlqdwUVs6fwVsKZ_Lt7tXEz6hvvVyFKBf-Yeq84hMH5PSWZUHiLYbFZ8UMeFDjhFjw5GwfZD_6PU1r5T_9phoj84ZHZ84sMctR8C_rHmV7flJAjApRUG30NmBxpR-ps5YW6cHy5wVA4M-naqDm7LPzw -X a
+```
+**Output**: eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyQUBtYWlsLmNvbSIsImlhdCI6MTc2MzU2NDIxNiwiZXhwIjoxNzY0MTY5MDE2LCJyb2xlIjoidXNlciJ9.
+
+2. Mit *-T* das den "exp"-Wert in die Vergangenheit setzen und Token speichern:
+```bash  
+[1] sub = "userA@mail.com"
+[2] iat = 1762959416    ==> TIMESTAMP = 2025-11-12 15:56:56 (UTC)
+[3] exp = 1763564216    ==> TIMESTAMP = 2025-11-19 15:56:56 (UTC)
+[4] role = "user"
+[5] *ADD A VALUE*
+[6] *DELETE A VALUE*
+[7] *UPDATE TIMESTAMPS*
+[0] Continue to next step
+
+Please select a field number:
+(or 0 to Continue)
+> 0
+Signature unchanged - no signing method specified (-S or -X)
+jwttool_d1e9ae0cf7d0f7c72b04cb03469f5ffa - Tampered token:
+[+] eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyQUBtYWlsLmNvbSIsImlhdCI6MTc2Mjk1OTQxNiwiZXhwIjoxNzYzNTY0MjE2LCJyb2xlIjoidXNlciJ9.
+```
+Dieser Token enthält nun die Information, dass kein Signieralgorithmus benutzt wird und am 29.11.2025 um 16:56:56 ungültig wird. 
+
+
+3. Manipulierten Token als Authentifizierung verwenden:
+<img width="1840" height="990" alt="image" src="https://github.com/user-attachments/assets/9c3bb735-4265-42a6-85fc-c1fa96f6978d" />
+
+Der Server akzeptiert den Token und weist somit ein schwaches Token-Expiry-Handling auf. 
+
+Die API ist kritisch anfällig für einen JWT-Signatur-Bypass (alg: none), der es einem Angreifer ermöglicht, beliebige Tokens ohne Signatur zu erstellen. Da die API die Gültigkeitsprüfung (exp-Claim) ignoriert, sobald das Token unsigniert ist, sind selbst Token, deren Ablaufdatum in der Vergangenheit liegt, dauerhaft gültig. Dies führt zu einer vollständigen Umgehung des Token-Lebenszyklus und des Ablaufs, da kompromittierte Tokens niemals ungültig werden. Von Angreifern kompromittierte Token sind demnach unbegrenzt gültig was ein enormes Sicherheitsrisiko darstellt.
+
+
+
+
+# Login-Mechanismen und Schutz
+Ein wichtiger Login-Mechanismus ist Rate-Limiting und Bruce-Force-Schutz bzw. Lockout.
+
+Der Login-Endpunkt (POST /identity/api/auth/login) der API weist zwei Hauptmängel in der Implementierung des Kontoschutzes auf:
+
+1. Fehlender Account Lockout (Brute-Force-Anfälligkeit)
+Die API verhindert keine unbegrenzten Anmeldeversuche gegen ein einzelnes Benutzerkonto.
+
+Es wurde ein Brute-Force-Angriff mit über 1000 fehlerhaften Passwörtern gegen das Konto userA@mail.com durchgeführt. Auch nach rund 1000 falsch geratenen Passwörtern wurde kein Rate Limiting getriggert oder ein Code 429 Too Many Requests zurückgegeben und der Login mit dem richtigen Passwort akzeptiert.
+
+Verwendeter ffuf Befehl:
+
+```bash
+
+ffuf -w Pwdb_top-1000.txt:PASSWD \
+     -X POST \
+     -u http://crapi.local:8888/identity/api/v1/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"email": "userA@mail.com", "password": "PASSWD"}'
+```
+
+Letzten 10 Zeilen des Outputs:
+
+```bash
+pass1234                [Status: 401, Size: 76, Words: 2, Lines: 1, Duration: 6393ms]
+brenda                  [Status: 401, Size: 76, Words: 2, Lines: 1, Duration: 7399ms]
+rocket                  [Status: 401, Size: 76, Words: 2, Lines: 1, Duration: 6291ms]
+debbie                  [Status: 401, Size: 76, Words: 2, Lines: 1, Duration: 6301ms]
+camaro                  [Status: 401, Size: 76, Words: 2, Lines: 1, Duration: 7597ms]
+Pw1234!                 [Status: 200, Size: 537, Words: 2, Lines: 1, Duration: 6405ms]
+8675309                 [Status: 401, Size: 76, Words: 2, Lines: 1, Duration: 6591ms]
+g13916055158            [Status: 401, Size: 76, Words: 2, Lines: 1, Duration: 6294ms]
+cheyenne                [Status: 401, Size: 76, Words: 2, Lines: 1, Duration: 5094ms]
+andreas                 [Status: 401, Size: 76, Words: 2, Lines: 1, Duration: 6192ms]
+:: Progress: [1001/1001] :: Job [1/1] :: 2 req/sec :: Duration: [0:06:51] :: Errors: 665 ::
+```
+Alle Fehlversuche zeigten eine künstliche Antwortverzögerung (Response Delay) von ca. 6–8 Sekunden, was den Angreifer bremst, aber kein sicheren Brute-Force-Schutz darstellt und eine Kontoübernahme höchstens zeitlich verzögert.
+Der korrekte Login-Versuch war erfolgreich (Status: 200) und beweist, dass kein Lockout-Mechanismus implementiert ist.
+
+## Schlussfolgerung: 
+Dies ermöglicht Brute-Force-Angriffe bis zum Erfolg und stellt ein hohes Risiko für die Kontoübernahme dar.
+
+## Fix
+- Account Lockout einführen: Implementierung einer festen Grenze für fehlgeschlagene Anmeldeversuche (z.B. 5 Versuche innerhalb von 15 Minuten). Konto zeitlich begrenzt- oder bis zur manuellen Freischaltung sperren bei Überschreitung.
+
+- Rate Limiting verbessern: Verwenden eines Standard-HTTP-Statuscodes (429 Too Many Requests) zur Signalisierung der Ratenbegrenzung. Die künstliche Verzögerung ist ein guter Zusatz, ersetzt aber keinen harten Lockout.
+
+- ReCAPTCHA/MFA: Implementierung eines CAPTCHA-Mechanismus nach 3-5 fehlgeschlagenen Versuchen, um automatisierte Angriffe zu erschweren, bevor der Lockout greift.
+
+
+2. User-Enumeration
+
+Bei der Benutzer-Aufzählung (User Enumeration) geht es darum, ob die API durch unterschiedliche Fehlermeldungen verrät, ob ein Benutzerkonto überhaupt in der Datenbank existiert.
+
+Angenommen ein Angreifer besitzt eine Liste von Millionen gestohlener E-Mail-Adressen (z.B. aus Leaks), möchte er wissen, welche davon bei einer bestimmten API registriert sind.
+
+Dabei können Fehlermeldungen der API Aufschluss darüber geben, ob eine Email Adresse überhaupt bei dieser API angemeldet ist:
+- Unsichere API: "Passwort falsch" (Angreifer weiß: User existiert).
+- Unsichere API: "Benutzer nicht gefunden" (Angreifer weiß: User existiert nicht).
+
+Durch diese spezifischen Meldungen kann der Angreifer seine Liste auf die tatsächlichen Nutzer des Dienstes reduzieren und gezielte Brute-Force-Angriffe starten (Credential Stuffing).
+
+Es wird mit folgenden Email/Passwort-Kombinationen getestet und die Antwort des Servers verglichen:
+- Richtige Email + falsches Passwort
+- Falsche Email + falsches Passwort
+
+<img width="1367" height="845" alt="image" src="https://github.com/user-attachments/assets/17ffd64a-b2e5-4b31-9f99-9f30cb3f43f8" />
+<img width="1367" height="845" alt="image" src="https://github.com/user-attachments/assets/c0a96eaf-608e-47d3-9618-6cf47dba86e8" />
+
+Der Vergleich der Serverantworten für einen existierenden und einen nicht-existierenden Benutzernamen mit einem falschen Passwort zeigt, dass die API spezifische Informationen über die Existenz des Benutzers preisgibt.
+
+- Test A (Existierender Benutzer): Bei einer registrierten E-Mail-Adresse (userA@mail.com) antwortet der Server mit 401 Unauthorized und der spezifischen Meldung "Invalid Credentials".
+
+- Test B (Nicht-existierender Benutzer): Bei einer nicht-registrierten E-Mail-Adresse antwortet der Server ebenfalls mit 401 Unauthorized, jedoch mit der expliziten Meldung "Given Email is not registered!".
+
+### Schlussfolgerung: 
+Die unterschiedlichen Fehlermeldungen ermöglichen es einem Angreifer, die Datenbank der registrierten Benutzer vollständig aufzuzählen (User Enumeration), was die Vorbereitung von Credential-Stuffing-Angriffen massiv vereinfacht.
+
+## Fix:
+Der Server muss jede Form von Unterscheidung zwischen den Fehlern "Benutzer existiert nicht" und "Passwort ist falsch" eliminieren:
+
+Statt:
+
+- "Given Email is not registered!" (Existiert nicht)
+- "Invalid Credentials" (Passwort falsch)
+
+sollte die API immer die gleiche Meldung senden, zum Beispiel:
+- "message": "Ungültige E-Mail-Adresse oder Passwort."
+
+Außerdem muss das Antwort Delay des Servers auch greifen, wenn die Email nicht registriert ist, da sonst Side Channel Angriffe über die Antwortzeit des Servers möglich wären!
+
+
+# Passwörter und sensitive Funktionen
+
+## Schwache Passwörter
+Auch wenn die Anwengung im UI beim Registrieren Anforderungen an das Passwort stellt, kann man in die Passwortanforderungen per API umgehen:
+<br>
+<img width="502" height="908" alt="image" src="https://github.com/user-attachments/assets/d098287f-5a1f-4b7f-a48d-bd041d44fddd" />
+<img width="1361" height="792" alt="image" src="https://github.com/user-attachments/assets/60cb571d-df78-413f-8f0a-82fb4ffbeb10" />
+
+Gleiches gilt für die Reset-Passwort-Funktion:
+<br>
+<img width="501" height="638" alt="image" src="https://github.com/user-attachments/assets/5be82491-7235-4055-9ebd-bbbbf8fa345c" />
+<img width="1371" height="792" alt="image" src="https://github.com/user-attachments/assets/edf20025-c17a-4113-83df-cf6fdea32e7f" />
+
+### Zusammenfassung
+Die Anwendung stellt im User Interface (UI) korrekte Anforderungen an die Passwortkomplexität. Der Registrierungs- oder Passwortänderungs-Endpunkt der API prüft diese Regeln jedoch nicht auf Serverseite. Dies ermöglicht einem Angreifer, durch direkte POST-Requests an die API (/auth/signup oder /user/change-password) triviale, kurze oder häufig verwendete Passwörter zu setzen.
+
+### Folge
+Das Schutzniveau des gesamten Systems wird auf das niedrigste akzeptierte Passwort reduziert, was Brute-Force- und Credential-Stuffing-Angriffe gegen die Konten erleichtert.
+
+### Fix
+- Serverseitige Validierung einführen: Die API-Endpunkte müssen die gleichen strengen Passwortrichtlinien (Länge, Komplexität, Blacklists) implementieren und strikt durchsetzen, die auch im UI verwendet werden.
+- Input-Validierung: Alle Passwörter müssen vor der Hashing-Operation auf die Einhaltung der Komplexitätsregeln geprüft werden.
+
+
 
