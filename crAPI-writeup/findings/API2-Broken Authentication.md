@@ -2,16 +2,16 @@
 # TL:DR
 Kritische Befunde:
 - Lang gültige JWTs (7 Tage) ohne Möglichkeit zur serverseitigen Invalidierung → gestohlene Tokens bleiben voll nutzbar.
-- JWT-Signatur-Bypass („alg: none“) möglich → API akzeptiert unsignierte Tokens und ignoriert abgelaufene exp-Werte.
-- Kein Account-Lockout, kein Rate-Limiting → Brute-Force-Angriffe gegen Logins jederzeit durchführbar.
-- User Enumeration über Fehlermeldungen → präzise Identifikation registrierter E-Mails möglich.
-- Serverseitige Passwortregeln fehlen → API akzeptiert triviale, schwache Passwörter trotz UI-Validierung.
+- JWT-Signatur-Bypass ("alg: none") möglich → API akzeptiert unsignierte Token und ignoriert abgelaufene exp-Werte.
+- Kein Account-Lockout, kein echtes Rate-Limiting → Brute-Force-Angriffe gegen Logins jederzeit möglich.
+- User Enumeration über Fehlermeldungen → Identifikation registrierter E-Mails möglich.
+- Keine serverseitigen Passwortregeln → API akzeptiert triviale, schwache Passwörter trotz UI-Validierung.
 - Sämtliche sensiblen Änderungen ohne Re-Auth (Passwort, E-Mail, Telefonnummer) → Bearer-Token allein reicht.
 - Vollständiger Account Takeover durch einmal kompromittierten Token (Passwort ändern → E-Mail ändern → Phone ändern → Opfer ausgesperrt).
 - Keine MFA, nur schwache 4-stellige OTPs ohne Rate-Limit → zusätzlicher Angriffsvektor.
 
-Kurzfazit:
-Ein einzelner kompromittierter JWT genügt für eine vollständige und irreversible Kontoübernahme. Die Kombination aus Signatur-Bypass, fehlender Token-Invalidierung, fehlender Re-Auth und schwachen Schutzmechanismen macht crAPI hochgradig angreifbar.
+**Kurzfazit:**
+Ein einzelner kompromittierter JWT genügt für eine vollständige und irreversible Kontoübernahme. Die Kombination aus Signatur-Bypass, fehlender Token-Invalidierung, fehlender Re-Auth und schwachen Schutzmechanismen macht die Anwendung hochgradig angreifbar.
 
 **API2:2023 – Broken Authentication** betrifft alle Fehler, bei denen sich ein Angreifer unberechtigt authentifizieren, fremde Accounts übernehmen 
 oder Tokens missbrauchen kann. Dazu zählen fehlerhafte Login-Mechanismen, unsichere Passwort- oder Token-Verwaltung sowie unzureichende 
@@ -25,15 +25,13 @@ Der Token wird bei jedem "frischen" Login generiert und dem User zugeteilt, der 
 <img width="1840" height="992" alt="image" src="https://github.com/user-attachments/assets/36abaeb4-e95e-4e32-8e1a-f781178e9a55" />
 
 
-Die JWTs sind mit RS256 signiert, enthalten die Rolle (z.B. user), die Login-Email sowie die Gültigkeitsdauer.
+Die JWTs sind mit RS256 signiert, enthalten role-Claims (z.B. user), die Login-Email sowie die Gültigkeitsdauer.
 
-Was sofort auffällt ist die unüblich lange Gültigkeitsdauer von 7 Tagen. Die Gültigkeitsdauer ist in den JWTs im Unix-Zeitformat angegeben 
-und lässt sich einfach zurückrechnen: 
+Die Gültigkeitsdauer ist in den JWTs im Unix-Zeitformat angegeben und lässt sich einfach zurückrechnen: 
 - exp – iat = 1763979951 – 1763375151 = 604800 Sekunden = ~7 Tage
 
 Dies stellt ein erhebliches Sicherheitsrisiko dar, da ein kompromittierter Token über die gesamte Laufzeit ungehinderten Zugriff ermöglicht. 
-Wenn die API keine serverseitige Token-Invalidierung implementiert, kann ein Angreifer selbst nach einem Logout des Nutzers das Konto weiterhin 
-vollständig missbrauchen.
+Wenn die API keine serverseitige Token-Invalidierung implementiert, kann ein Angreifer selbst nach einem Logout des Nutzers das Konto weiterhin vollständig missbrauchen.
 
 ## Token-Invalidierung
 1. Um die API auf Token-Invalidierung zu prüfen logge ich mich über das UI ein und speichere den Token, den die API nach dem Einloggen          zurückgibt:
@@ -55,9 +53,9 @@ Ablauf der Token-Lebenszeit (7 Tage!) vollständigen Zugriff auf das Konto des O
 - Invalidation aller aktiven Tokens bei kritischen Aktionen wie Logout, Passwortänderung, MFA-Änderung etc.
 
 ## JWT-Downgrading Angriff (alg: none)
-Beim Dekodieren der JWTs sieht man, dass die Bearer Token mit RS256 signiert werden. Ein typischer Angriff auf JWTs ist ein Downgrading Angriff bei dem der Signaturalgorithmus umgangen wird, indem der Signieralgorithmus im Token-Header von "RS256" auf schwache Signieralgorithmen gezwungen wird.
+Beim Dekodieren der JWTs sieht man, dass die Bearer Token mit RS256 signiert werden. Ein typischer (wenn auch selten erfolgreicher) Angriff auf JWTs ist ein Downgrading Angriff bei dem der Signaturalgorithmus umgangen wird, indem der Signieralgorithmus im Token-Header von "RS256" auf schwache Signieralgorithmen gezwungen wird (z.B. symmetrische Algorithmen wie HS256, oder HMAC brute-force mit schwachem secret).
 
-Mit einem Tool wie jwt_tool kann man den Token Header manipulieren, sodass anstatt des Headers "alg: RS265" der Header "alg: none" geschickt wird, was bei einer Schwachstelle den gesamten Signieralgorithmus bypasst und somit auch der Private-Key des Servers irrelevant wird.
+Mit einem Tool wie jwt_tool kann man den Token Header manipulieren, sodass anstatt des Headers "alg: RS265" der Header "alg: none" kodiert wird, was bei einer Schwachstelle den gesamten Signieralgorithmus bypasst und somit auch der Private-Key des Servers irrelevant wird.
 
 Für diese Schwachstelle bietet jwt_tool ein eigenes Argument **-X a** um vier verschiedene Versionen vom "alg: none" Header (mit verschiedenen Schreibweisen von *none*) zu erstellen. Dazu wird dem Tool ein gültiger Token übergeben und das Argument **-X a** gesetzt:
 
@@ -110,7 +108,7 @@ Signature unchanged - no signing method specified (-S or -X)
 jwttool_d1e9ae0cf7d0f7c72b04cb03469f5ffa - Tampered token:
 [+] eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyQUBtYWlsLmNvbSIsImlhdCI6MTc2Mjk1OTQxNiwiZXhwIjoxNzYzNTY0MjE2LCJyb2xlIjoidXNlciJ9.
 ```
-Dieser Token enthält nun die Information, dass kein Signieralgorithmus benutzt wird und am 29.11.2025 um 16:56:56 ungültig wird. 
+Dieser Token enthält nun die Information, dass kein Signieralgorithmus benutzt wird und am 19.11.2025 um 15:56:56 ungültig wird. 
 
 
 3. Manipulierten Token als Authentifizierung verwenden:
@@ -123,8 +121,6 @@ Dass die API manipulierte Token akzeptiert kann man ebenfalls nachweisen, indem 
 <img width="1840" height="958" alt="image" src="https://github.com/user-attachments/assets/717448a5-3ca2-45e4-99fc-4a891ebb82fa" />
 
 Die API ist kritisch anfällig für einen JWT-Signatur-Bypass (alg: none), der es einem Angreifer ermöglicht, beliebige Tokens ohne Signatur zu erstellen. Da die API die Gültigkeitsprüfung (exp-Claim) ignoriert, sobald das Token unsigniert ist, sind selbst Token, deren Ablaufdatum in der Vergangenheit liegt, dauerhaft gültig. Dies führt zu einer vollständigen Umgehung des Token-Lebenszyklus und des Ablaufs, da kompromittierte Tokens niemals ungültig werden. Von Angreifern kompromittierte Token sind demnach unbegrenzt gültig was ein enormes Sicherheitsrisiko darstellt.
-
-
 
 
 # Login-Mechanismen und Schutz
