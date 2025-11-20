@@ -1,4 +1,18 @@
 # Broken Authentication
+# TL:DR
+Kritische Befunde:
+- Lang gültige JWTs (7 Tage) ohne Möglichkeit zur serverseitigen Invalidierung → gestohlene Tokens bleiben voll nutzbar.
+- JWT-Signatur-Bypass („alg: none“) möglich → API akzeptiert unsignierte Tokens und ignoriert abgelaufene exp-Werte.
+- Kein Account-Lockout, kein Rate-Limiting → Brute-Force-Angriffe gegen Logins jederzeit durchführbar.
+- User Enumeration über Fehlermeldungen → präzise Identifikation registrierter E-Mails möglich.
+- Serverseitige Passwortregeln fehlen → API akzeptiert triviale, schwache Passwörter trotz UI-Validierung.
+- Sämtliche sensiblen Änderungen ohne Re-Auth (Passwort, E-Mail, Telefonnummer) → Bearer-Token allein reicht.
+- Vollständiger Account Takeover durch einmal kompromittierten Token (Passwort ändern → E-Mail ändern → Phone ändern → Opfer ausgesperrt).
+- Keine MFA, nur schwache 4-stellige OTPs ohne Rate-Limit → zusätzlicher Angriffsvektor.
+
+Kurzfazit:
+Ein einzelner kompromittierter JWT genügt für eine vollständige und irreversible Kontoübernahme. Die Kombination aus Signatur-Bypass, fehlender Token-Invalidierung, fehlender Re-Auth und schwachen Schutzmechanismen macht crAPI hochgradig angreifbar.
+
 **API2:2023 – Broken Authentication** betrifft alle Fehler, bei denen sich ein Angreifer unberechtigt authentifizieren, fremde Accounts übernehmen 
 oder Tokens missbrauchen kann. Dazu zählen fehlerhafte Login-Mechanismen, unsichere Passwort- oder Token-Verwaltung sowie unzureichende 
 Schutzmaßnahmen gegen Brute-Force- oder Credential-Stuffing-Angriffe. Die Folge sind Kontoübernahmen, unautorisierte API-Aufrufe 
@@ -103,6 +117,10 @@ Dieser Token enthält nun die Information, dass kein Signieralgorithmus benutzt 
 <img width="1840" height="990" alt="image" src="https://github.com/user-attachments/assets/9c3bb735-4265-42a6-85fc-c1fa96f6978d" />
 
 Der Server akzeptiert den Token und weist somit ein schwaches Token-Expiry-Handling auf. 
+
+Dass die API manipulierte Token akzeptiert kann man ebenfalls nachweisen, indem man die Token vom Endpunkt */verify* validieren lässt:
+
+<img width="1840" height="958" alt="image" src="https://github.com/user-attachments/assets/717448a5-3ca2-45e4-99fc-4a891ebb82fa" />
 
 Die API ist kritisch anfällig für einen JWT-Signatur-Bypass (alg: none), der es einem Angreifer ermöglicht, beliebige Tokens ohne Signatur zu erstellen. Da die API die Gültigkeitsprüfung (exp-Claim) ignoriert, sobald das Token unsigniert ist, sind selbst Token, deren Ablaufdatum in der Vergangenheit liegt, dauerhaft gültig. Dies führt zu einer vollständigen Umgehung des Token-Lebenszyklus und des Ablaufs, da kompromittierte Tokens niemals ungültig werden. Von Angreifern kompromittierte Token sind demnach unbegrenzt gültig was ein enormes Sicherheitsrisiko darstellt.
 
@@ -221,8 +239,25 @@ Die Anwendung stellt im User Interface (UI) korrekte Anforderungen an die Passwo
 Das Schutzniveau des gesamten Systems wird auf das niedrigste akzeptierte Passwort reduziert, was Brute-Force- und Credential-Stuffing-Angriffe gegen die Konten erleichtert.
 
 ### Fix
-- Serverseitige Validierung einführen: Die API-Endpunkte müssen die gleichen strengen Passwortrichtlinien (Länge, Komplexität, Blacklists) implementieren und strikt durchsetzen, die auch im UI verwendet werden.
+- Serverseitige Validierung einführen: Die API-Endpunkte müssen die gleichen strengen Passwortrichtlinien implementieren und strikt durchsetzen, die auch im UI verwendet werden.
 - Input-Validierung: Alle Passwörter müssen vor der Hashing-Operation auf die Einhaltung der Komplexitätsregeln geprüft werden.
 
 
+## Sensitive Funktionen
+Dieser Abschnitt beschreibt, dass sensible Änderungen am Benutzerkonto – etwa das Aktualisieren der E-Mail-Adresse oder anderer sicherheitsrelevanter Daten – ohne erneute Passwortbestätigung möglich sind. Endpunkte wie /api/v2/user/change_email erzwingen keine zusätzliche Authentifizierung und öffnen damit Angriffsflächen, wenn ein gültiges Session-Token abgegriffen oder missbraucht wird.
+
+### Multi-Faktor-Authentifizierung
+crAPI implementiert keinerlei Form der Multi-Faktor-Authentifizierung, obwohl kritische Funktionen (Mailwechsel, Passwortänderung usw.) vorhanden sind. Dadurch fehlt eine wesentliche Schutzschicht gegen Kontoübernahmen und Session-Hijacking.
+
+### Passwortänderung
+Wie im letzten Abschnitt gezeigt verlangt die API zum Ändern des Passworts lediglich den Bearer Token des Users was nicht der Best Practice entspricht, da Angreifer Bearer Token vergleichsweise einfach durch Session-Hijacking oder XSS basierten Angriffen kompromittieren können und somit Kontrolle über den gesamten Account des Opfers bekommen.
+
+### Email-Aktualisierung
+Auch der */change-email* Email Endpunkt weist dieselbe Schwachstelle auf wie der Endpunkt zur Passwortänderung und erlaubt es einem Angreifer mit nur dem Bearer Token und der Email (welche man dem Bearer Token entnehmen kann) die Email des Accounts zu ändern und so sämtliche Sicherheitskritische Funktionen zu übernehmen.
+
+### Change-Phone-Number
+Der Endpunkt */change-phone-number* weist alleine keine Schwachstelle auf, da er die verknüpfte Email (und den Bearer Token) des Accounts benutzt, um ein OTP zu verschicken, welches bei dem Endpunkt */verify-phone-otp* validiert werden muss, bevor die Nummer geändert wird. Allerdings kann ein Angreifer mit dem Bearer Token vorher die Email des Accounts ändern, was die OTP-Verifizierung per Email vollständig umgeht. 
+
+## Fazit
+Mit einem einzigen gestohlenen Bearer-Token ist eine vollständige und irreversible Kontoübernahme möglich, da sowohl Passwort- als auch E-Mail- und Telefonnummer-Änderungen ohne erneute Authentifizierung oder zusätzliche Sicherheitsfaktoren durchgeführt werden können. Der legitime Nutzer kann sich danach weder anmelden noch das Konto wiederherstellen. Ebenfalls lassen sich theoretisch aufgrund von schwachen 4-stelligen OTPs und Abwesenheit von Rate Limiting diese OTPs brute-forcen, was allerdings nicht für eine vollständige Kontoübernahme ausreicht.
 
