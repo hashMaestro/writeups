@@ -17,13 +17,15 @@ Sie dient als legale, lokal selbst gehostete Trainingsplattform für Web-Pentest
 - Identifikation und begründete Bewertung relevanter Schwachstellen innerhalb der crAPI-Instanz
 
 ### Inhaltsverzeichnis
-**Setup** <br>
+**1. Setup** <br>
 - [Environment](environment.md)
 - [Proxy](proxy.md)
 
-**Reconnaissance**
+**2. Reconnaissance**
 - [API-Recon](api-recon.md)
 
-**Findings**
+**3. Findings**
 - [Broken Object Level Authorization](API1-BOLA.md)
 - [Broken Authentication](API2-Broken_Authentication.md)
+- [Broken Object Property Level Authorization](API3-BOPLA.md)
+- [Broken Function Level Authorization](API5-BFLA.md)
