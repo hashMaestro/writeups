@@ -78,7 +78,7 @@ Der Server lieferte stets die Daten des ursprünglichen Token-Besitzers (userA) 
 - Die API vertraut den sekundären Payload-Claims (die nicht zur Identität gehören) und führt die angeforderte Funktion aus.
 - Die API ignoriert jedoch den manipulierten sub Claim und identifiziert den Benutzer über einen versteckten Mechanismus (z.B. einen unsichtbaren jti Claim oder einen Hash des Original-Tokens), der nicht manipuliert wurde und weiterhin auf User A verweist.
 
-Das bedeutet, dass die API zwar kritisch anfällig für den Signatur-Bypass ist, die horizontale Rechteausweitung jedoch aufgrund eines unbekannten Identifikators verhindert wird. Für eine horizontale Rechteausweitung ist also nicht nur die Email und der Username nötig sondern ein (für mich aktuell) obufszierter ID-Mechanismus.
+Das bedeutet, dass die API zwar kritisch anfällig für den Signatur-Bypass ist, die horizontale Rechteausweitung jedoch aufgrund eines unbekannten Identifikators verhindert wird. Für eine horizontale Rechteausweitung ist also nicht nur die Email und der Username nötig sondern ein (für mich aktuell) obfuskierter Identifikator.
 
 ### Token-Expiry-Handling
 Dass man den Signieralgorithmus bypassen kann ermöglicht es, das Token-Expiry-Handling des Servers auch ohne private key zu testen.
@@ -124,7 +124,7 @@ Die API ist kritisch anfällig für einen JWT-Signatur-Bypass (alg: none), der e
 
 
 # Login-Mechanismen und Schutz
-Ein wichtiger Login-Mechanismus ist Rate-Limiting und Bruce-Force-Schutz bzw. Lockout.
+Ein wichtiger Login-Mechanismus ist Rate-Limiting und Brute-Force-Schutz bzw. Lockout.
 
 Der Login-Endpunkt (POST /identity/api/auth/login) der API weist zwei Hauptmängel in der Implementierung des Kontoschutzes auf:
 
@@ -218,7 +218,7 @@ Außerdem muss das Antwort Delay des Servers auch greifen, wenn die Email nicht 
 # Passwörter und sensitive Funktionen
 
 ## Schwache Passwörter
-Auch wenn die Anwengung im UI beim Registrieren Anforderungen an das Passwort stellt, kann man in die Passwortanforderungen per API umgehen:
+Auch wenn die Anwendung im UI beim Registrieren Anforderungen an das Passwort stellt, kann man in die Passwortanforderungen per API umgehen:
 <br>
 <img width="502" height="908" alt="image" src="https://github.com/user-attachments/assets/d098287f-5a1f-4b7f-a48d-bd041d44fddd" />
 <img width="1361" height="792" alt="image" src="https://github.com/user-attachments/assets/60cb571d-df78-413f-8f0a-82fb4ffbeb10" />
