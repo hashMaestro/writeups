@@ -1,6 +1,13 @@
 # BFLA 
 Broken Function Level Authorization (BFLA) ist eine Autorisierungs-Schwachstelle, bei der ein Benutzer Funktionen (Endpunkte/Actions) ausführen kann, für die seine Rolle nicht berechtigt ist. Es geht dabei um den Funktions- bzw. Feature-Level, nicht primär um einzelne Datenobjekte.
 
+## TL;DR
+- Admin-Funktionen wie DELETE /identity/api/v2/admin/videos/{id} sind ohne Rollenprüfung für jeden Benutzer aufrufbar.
+- Ein normaler User kann damit beliebige Videos löschen, obwohl dies eine privilegierte Admin-Funktion ist.
+- Durch einfache Enumeration der Video-IDs wäre ein vollständiges Löschen aller Videos der Plattform möglich.
+- Ursache: fehlende serverseitige Funktionsautorisation (BFLA) und keine Trennung zwischen normalen und privilegierten Endpunkten.
+
+### BFLA
 In crAPI sind für diese Schwachstelle alle Endpunkte interessant, die eine privilegierte Action (z.B. Admin Funktionalitäten) ermöglichen wie der Endpunkt *DELETE /identity/api/v2/admin/videos/{id}*
 
 Wenn ein User den Endpunkt aufruft, wird fälschlicherweise nicht die Rolle des User überprüft, wodurch ein beliebiger User jedes beliebige Video auf der Plattform löschen kann:
