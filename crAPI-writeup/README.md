@@ -29,3 +29,5 @@ Sie dient als legale, lokal selbst gehostete Trainingsplattform für Web-Pentest
 - [Broken Authentication](findings/API2-Broken_Authentication.md)
 - [Broken Object Property Level Authorization](findings/API3-BOPLA.md)
 - [Broken Function Level Authorization](findings/API5-BFLA.md)
+
+<sub>Die API wurde zuerst Ende 2024 getestet, das Writeup dazu wurde nachträglich erstellt. Zuletzt geändert: 02.12.2025 <sub>
