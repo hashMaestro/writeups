@@ -18,14 +18,14 @@ Sie dient als legale, lokal selbst gehostete Trainingsplattform für Web-Pentest
 
 ### Inhaltsverzeichnis
 **1. Setup** <br>
-- [Environment](environment.md)
-- [Proxy](proxy.md)
+- [Environment](setup/environment.md)
+- [Proxy](setup/proxy.md)
 
 **2. Reconnaissance**
-- [API-Recon](api-recon.md)
+- [API-Recon](reconnaissance/api-recon.md)
 
 **3. Findings**
-- [Broken Object Level Authorization](API1-BOLA.md)
-- [Broken Authentication](API2-Broken_Authentication.md)
-- [Broken Object Property Level Authorization](API3-BOPLA.md)
-- [Broken Function Level Authorization](API5-BFLA.md)
+- [Broken Object Level Authorization](findings/API1-BOLA.md)
+- [Broken Authentication](findings/API2-Broken_Authentication.md)
+- [Broken Object Property Level Authorization](findings/API3-BOPLA.md)
+- [Broken Function Level Authorization](findings/API5-BFLA.md)
